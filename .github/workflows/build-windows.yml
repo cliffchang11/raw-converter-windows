@@ -29,53 +29,26 @@ jobs:
         shell: pwsh
         run: pip install customtkinter pyinstaller pillow --upgrade
 
-      - name: 🔧 Download ExifTool for Windows
+      - name: 🔧 Install ExifTool via Chocolatey
         shell: pwsh
         run: |
+          # Chocolatey 在 GitHub Actions Windows runner 上已預裝，直接安裝 ExifTool
+          choco install exiftool --yes --no-progress
+          
+          # 找到 chocolatey 安裝的 exiftool.exe 並複製到 assets/
           New-Item -ItemType Directory -Force -Path "assets" | Out-Null
-          
-          # 動態取得 ExifTool 最新版本號
-          try {
-            $page = Invoke-WebRequest -Uri "https://exiftool.org" -UseBasicParsing -TimeoutSec 30
-            $match = [regex]::Match($page.Content, 'exiftool-(\d+\.\d+)\.zip')
-            if ($match.Success) {
-              $latestVer = $match.Groups[1].Value
-              Write-Host "Latest ExifTool version: $latestVer"
-              $primaryUrl = "https://exiftool.org/exiftool-$latestVer.zip"
-            } else {
-              $primaryUrl = "https://exiftool.org/exiftool-13.05.zip"
-            }
-          } catch {
-            $primaryUrl = "https://exiftool.org/exiftool-13.05.zip"
+          $exiftoolPath = (Get-Command exiftool -ErrorAction SilentlyContinue).Source
+          if (-not $exiftoolPath) {
+            $exiftoolPath = "C:\ProgramData\chocolatey\bin\exiftool.exe"
           }
-          
-          $urls = @($primaryUrl, "https://exiftool.org/exiftool-13.00.zip", "https://exiftool.org/exiftool-12.99.zip")
-          $downloaded = $false
-          foreach ($url in $urls) {
-            try {
-              Write-Host "Trying: $url"
-              Invoke-WebRequest -Uri $url -OutFile "assets\exiftool.zip" -UseBasicParsing -TimeoutSec 60
-              $downloaded = $true
-              Write-Host "Downloaded OK from: $url"
-              break
-            } catch {
-              Write-Host "Failed ($url): $_"
-            }
-          }
-          if (-not $downloaded) { Write-Error "All ExifTool URLs failed!"; exit 1 }
-          
-          Expand-Archive -Path "assets\exiftool.zip" -DestinationPath "assets\tmp" -Force
-          $exe = Get-ChildItem "assets\tmp" -Recurse -Include "*.exe" | Select-Object -First 1
-          if ($exe) {
-            Copy-Item $exe.FullName -Destination "assets\exiftool.exe"
-            Write-Host "ExifTool ready: $((Get-Item 'assets\exiftool.exe').Length) bytes"
+          if (Test-Path $exiftoolPath) {
+            Copy-Item $exiftoolPath -Destination "assets\exiftool.exe"
+            Write-Host "ExifTool ready at: $exiftoolPath"
+            Write-Host "Size: $((Get-Item 'assets\exiftool.exe').Length) bytes"
           } else {
-            Write-Error "No .exe found in ExifTool archive!"
+            Write-Error "exiftool.exe not found after choco install!"
             exit 1
           }
-          Remove-Item "assets\exiftool.zip" -Force
-          Remove-Item "assets\tmp" -Recurse -Force
-
 
       - name: 🔨 Build .exe with PyInstaller
         shell: pwsh
