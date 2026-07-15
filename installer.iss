@@ -3,6 +3,7 @@ AppName=RAW Converter
 AppVersion=1.0.0
 AppPublisher=Cliff Chang
 AppPublisherURL=https://github.com/cliffchang11/raw-converter-windows
+AppMutex=RAW_Converter_Mutex_Unique_998877
 DefaultDirName={autopf}\RAW Converter
 DefaultGroupName=RAW Converter
 OutputBaseFilename=RAW_Converter_Setup_v1.0

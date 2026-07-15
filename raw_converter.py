@@ -18,6 +18,15 @@ ctk.set_default_color_theme("blue")
 APP_VERSION = "1.0.0"
 RAW_EXTENSIONS = {'.nef', '.cr2', '.cr3', '.arw', '.dng', '.orf', '.raf', '.rw2', '.pef', '.sr2'}
 
+# ── Windows 獨佔 Mutex 鎖，用於防重複啟動與讓安裝程式能檢測執行狀態 ──
+mutex_handle = None
+if sys.platform == 'win32':
+    try:
+        import ctypes
+        mutex_handle = ctypes.windll.kernel32.CreateMutexW(None, False, "RAW_Converter_Mutex_Unique_998877")
+    except Exception:
+        pass
+
 
 def get_exiftool_path() -> Path:
     """取得 exiftool.exe 路徑，支援 PyInstaller 打包模式"""
