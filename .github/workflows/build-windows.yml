@@ -109,11 +109,12 @@ jobs:
           path: installer_output/*.exe
           retention-days: 30
 
-      - name: 🚀 Create GitHub Release (tag only)
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: 🚀 Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: "RAW 批次轉檔工具 ${{ github.ref_name }}"
+          # 當手動觸發時使用輸入的版本號，否則使用 tag 名稱
+          tag_name: ${{ github.event.inputs.version || github.ref_name }}
+          name: "RAW 批次轉檔工具 ${{ github.event.inputs.version || github.ref_name }}"
           body: |
             ## 📷 RAW 批次轉檔工具 Windows 版
 
@@ -128,3 +129,6 @@ jobs:
             ### 系統需求
             Windows 10 / 11 (64位元)
           files: installer_output/*.exe
+          draft: false
+          prerelease: false
+
