@@ -23,7 +23,7 @@ powershell -Command ^
     "};" ^
     "$zip = 'assets\exiftool_tmp.zip';" ^
     "Write-Host '下載中...' $url;" ^
-    "Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing;" ^
+    "curl.exe -L -o $zip $url;" ^
     "Write-Host '解壓縮中...';" ^
     "Expand-Archive -Path $zip -DestinationPath 'assets\exiftool_tmp' -Force;" ^
     "Get-ChildItem 'assets\exiftool_tmp' -Recurse -Filter 'exiftool(-k).exe' | " ^

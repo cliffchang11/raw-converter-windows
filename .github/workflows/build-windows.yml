@@ -63,7 +63,7 @@ jobs:
           
           $zip = "assets\exiftool_tmp.zip"
           Write-Host "Downloading ExifTool from $url..."
-          Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
+          curl.exe -L -o $zip $url
           Write-Host "Extracting ExifTool..."
           Expand-Archive -Path $zip -DestinationPath "assets\exiftool_tmp" -Force
           
