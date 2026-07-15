@@ -13,7 +13,7 @@ powershell -Command ^
     "  $link = ($html.Links | Where-Object { $_.href -like '*exiftool-*_64.zip*' } | Select-Object -First 1).href;" ^
     "  if ($link) { " ^
     "    if ($link.Contains('sourceforge.net')) { " ^
-    "      $url = $link.Replace('https://sourceforge.net/projects/', 'https://downloads.sourceforge.net/project/').Replace('/files/', '/').Replace('/download', '') " ^
+    "      $url = $link.Replace('https://sourceforge.net/projects/', 'https://downloads.sourceforge.net/project/').Replace('/files/', '/') -replace '/download$', '' " ^
     "    } elseif ($link.StartsWith('http')) { $url = $link } else { $url = 'https://exiftool.org/' + $link } " ^
     "  } else { " ^
     "    $url = 'https://downloads.sourceforge.net/project/exiftool/exiftool-13.59_64.zip' " ^

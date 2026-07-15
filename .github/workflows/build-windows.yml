@@ -43,10 +43,10 @@ jobs:
               $link = ($html.Links | Where-Object { $_.href -like "*exiftool-*_64.zip*" } | Select-Object -First 1).href
               if ($link) {
                   if ($link.Contains("sourceforge.net")) {
-                      # 轉換 SourceForge 下載頁連結為直連網址
+                      # 轉換 SourceForge 下載頁連結為直連網址，只替換結尾的 /download
                       $url = $link.Replace("https://sourceforge.net/projects/", "https://downloads.sourceforge.net/project/")
                       $url = $url.Replace("/files/", "/")
-                      $url = $url.Replace("/download", "")
+                      $url = $url -replace "/download$", ""
                   } elseif ($link.StartsWith("http")) {
                       $url = $link
                   } else {
