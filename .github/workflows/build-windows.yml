@@ -84,6 +84,14 @@ jobs:
         shell: pwsh
         run: |
           $version = "${{ github.event.inputs.version }}"
+          if (-not $version -or $version -eq "") {
+              $refName = "${{ github.ref_name }}"
+              if ($refName -like "v*") {
+                  $version = $refName.Substring(1)
+              } else {
+                  $version = $refName
+              }
+          }
           if (-not $version -or $version -eq "") { $version = "1.0.0" }
           Write-Host "Building version: $version"
           

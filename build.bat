@@ -49,7 +49,7 @@ echo [4/6] 使用 PyInstaller 打包 .exe（約需 1-3 分鐘）...
 pyinstaller ^
     --onefile ^
     --windowed ^
-    --name "RAW轉檔工具" ^
+    --name "RAW_Converter" ^
     --add-data "assets/exiftool.exe;assets" ^
     --clean ^
     --noconfirm ^
@@ -113,13 +113,13 @@ echo.
 echo =====================================================
 echo   ✅ 全部完成！以下是您的輸出檔案：
 echo.
-if exist "installer_output\RAW轉檔工具_Setup_v1.0.exe" (
+if exist "installer_output\RAW_Converter_Setup_v1.0.0.exe" (
     echo   ^📦 安裝程式：
-    echo      %CD%\installer_output\RAW轉檔工具_Setup_v1.0.exe
+    echo      %CD%\installer_output\RAW_Converter_Setup_v1.0.0.exe
     echo.
 )
 echo   ^💾 單一執行檔：
-echo      %CD%\dist\RAW轉檔工具.exe
+echo      %CD%\dist\RAW_Converter.exe
 echo =====================================================
 echo.
 pause
@@ -131,7 +131,7 @@ echo =====================================================
 echo   ✅ 完成！（僅單一執行檔，無安裝程式）
 echo.
 echo   ^💾 執行檔位置：
-echo      %CD%\dist\RAW轉檔工具.exe
+echo      %CD%\dist\RAW_Converter.exe
 echo =====================================================
 echo.
 pause
