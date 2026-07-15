@@ -10,12 +10,15 @@ powershell -Command ^
     "Write-Host '正在獲取最新 ExifTool 版本資訊...';" ^
     "try { " ^
     "  $html = Invoke-WebRequest -Uri 'https://exiftool.org/' -UseBasicParsing -TimeoutSec 15;" ^
-    "  $link = ($html.Links | Where-Object { $_.href -like 'exiftool-*_64.zip' } | Select-Object -First 1).href;" ^
-    "  if (-not $link) { $link = 'exiftool-13.59_64.zip' }" ^
+    "  $link = ($html.Links | Where-Object { $_.href -like '*exiftool-*_64.zip*' } | Select-Object -First 1).href;" ^
+    "  if ($link) { " ^
+    "    if ($link.StartsWith('http')) { $url = $link } else { $url = 'https://exiftool.org/' + $link }" ^
+    "  } else { " ^
+    "    $url = 'https://sourceforge.net/projects/exiftool/files/exiftool-13.59_64.zip/download' " ^
+    "  } " ^
     "} catch { " ^
-    "  $link = 'exiftool-13.59_64.zip' " ^
+    "  $url = 'https://sourceforge.net/projects/exiftool/files/exiftool-13.59_64.zip/download' " ^
     "};" ^
-    "$url = 'https://exiftool.org/' + $link;" ^
     "$zip = 'assets\exiftool_tmp.zip';" ^
     "Write-Host '下載中...' $url;" ^
     "Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing;" ^

@@ -36,21 +36,26 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path "assets" | Out-Null
           
-          # 動態解析官網最新 64-bit 版本下載路徑，防止版本更新時舊連結 404
+          # 動態解析官網最新 64-bit 版本下載路徑，支援 SourceForge 絕對網址與相對網址
           Write-Host "Fetching latest ExifTool download link from exiftool.org..."
           try {
               $html = Invoke-WebRequest -Uri "https://exiftool.org/" -UseBasicParsing -TimeoutSec 15
-              $link = ($html.Links | Where-Object { $_.href -like "exiftool-*_64.zip" } | Select-Object -First 1).href
-              if (-not $link) {
-                  Write-Host "Failed to parse link from HTML. Falling back to 13.59"
-                  $link = "exiftool-13.59_64.zip"
+              $link = ($html.Links | Where-Object { $_.href -like "*exiftool-*_64.zip*" } | Select-Object -First 1).href
+              if ($link) {
+                  if ($link.StartsWith("http")) {
+                      $url = $link
+                  } else {
+                      $url = "https://exiftool.org/$link"
+                  }
+              } else {
+                  Write-Host "Failed to parse link from HTML. Falling back to SourceForge 13.59"
+                  $url = "https://sourceforge.net/projects/exiftool/files/exiftool-13.59_64.zip/download"
               }
           } catch {
-              Write-Host "Network error while parsing page. Falling back to 13.59"
-              $link = "exiftool-13.59_64.zip"
+              Write-Host "Network error while parsing page. Falling back to SourceForge 13.59"
+              $url = "https://sourceforge.net/projects/exiftool/files/exiftool-13.59_64.zip/download"
           }
           
-          $url = "https://exiftool.org/$link"
           $zip = "assets\exiftool_tmp.zip"
           Write-Host "Downloading ExifTool from $url..."
           Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
