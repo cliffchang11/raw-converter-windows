@@ -40,11 +40,12 @@ def get_raw_files(source_dir: Path) -> list:
 def get_time_prefix(raw_path: Path, exiftool: Path) -> str:
     """使用 ExifTool 提取拍攝時間作為檔名前綴"""
     try:
-        cmd = [str(exiftool), '-s3', '-DateTimeOriginal', str(raw_path)]
-        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                             text=True, timeout=10,
+        cmd = [str(exiftool), '-charset', 'filename=utf8', '-s3', '-DateTimeOriginal', '-@', '-']
+        res = subprocess.run(cmd, input=f"{raw_path}\n".encode('utf-8'),
+                             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                             timeout=10,
                              creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0)
-        dt = res.stdout.strip()
+        dt = res.stdout.decode('utf-8', errors='ignore').strip()
         if dt:
             clean = ''.join(c for c in dt if c.isdigit())
             if len(clean) >= 14:
@@ -72,24 +73,33 @@ def convert_single_raw(raw_path: Path, dest_path: Path, exiftool: Path) -> tuple
 
     try:
         # 步驟 1：嘗試 JpgFromRaw（Nikon、Sony 常用）
-        with open(temp_jpg, 'wb') as f:
-            subprocess.run([str(exiftool), '-b', '-JpgFromRaw', str(raw_path)],
-                           stdout=f, stderr=subprocess.DEVNULL, timeout=30,
-                           creationflags=no_window)
+        cmd = [str(exiftool), '-charset', 'filename=utf8', '-b', '-JpgFromRaw', '-@', '-']
+        res = subprocess.run(cmd, input=f"{raw_path}\n".encode('utf-8'),
+                             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=30,
+                             creationflags=no_window)
+        if res.returncode == 0 and len(res.stdout) > 50 * 1024:
+            with open(temp_jpg, 'wb') as f:
+                f.write(res.stdout)
 
         # 步驟 2：嘗試 PreviewImage（Canon CR3、DNG 等）
         if not temp_jpg.exists() or temp_jpg.stat().st_size < 50 * 1024:
-            with open(temp_jpg, 'wb') as f:
-                subprocess.run([str(exiftool), '-b', '-PreviewImage', str(raw_path)],
-                               stdout=f, stderr=subprocess.DEVNULL, timeout=30,
-                               creationflags=no_window)
+            cmd = [str(exiftool), '-charset', 'filename=utf8', '-b', '-PreviewImage', '-@', '-']
+            res = subprocess.run(cmd, input=f"{raw_path}\n".encode('utf-8'),
+                                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=30,
+                                 creationflags=no_window)
+            if res.returncode == 0 and len(res.stdout) > 50 * 1024:
+                with open(temp_jpg, 'wb') as f:
+                    f.write(res.stdout)
 
         # 步驟 3：最後嘗試 ThumbnailImage
         if not temp_jpg.exists() or temp_jpg.stat().st_size < 10 * 1024:
-            with open(temp_jpg, 'wb') as f:
-                subprocess.run([str(exiftool), '-b', '-ThumbnailImage', str(raw_path)],
-                               stdout=f, stderr=subprocess.DEVNULL, timeout=30,
-                               creationflags=no_window)
+            cmd = [str(exiftool), '-charset', 'filename=utf8', '-b', '-ThumbnailImage', '-@', '-']
+            res = subprocess.run(cmd, input=f"{raw_path}\n".encode('utf-8'),
+                                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=30,
+                                 creationflags=no_window)
+            if res.returncode == 0 and len(res.stdout) > 10 * 1024:
+                with open(temp_jpg, 'wb') as f:
+                    f.write(res.stdout)
 
         if not temp_jpg.exists() or temp_jpg.stat().st_size < 10 * 1024:
             if temp_jpg.exists():
@@ -102,12 +112,11 @@ def convert_single_raw(raw_path: Path, dest_path: Path, exiftool: Path) -> tuple
         temp_jpg.rename(dest_path)
 
         # 步驟 5：複製原始 EXIF 至輸出檔案
-        subprocess.run(
-            [str(exiftool), '-overwrite_original', '-TagsFromFile', str(raw_path),
-             '-all:all>all:all', '-unsafe', str(dest_path)],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            timeout=30, creationflags=no_window
-        )
+        cmd = [str(exiftool), '-charset', 'filename=utf8', '-@', '-']
+        args = f"-overwrite_original\n-TagsFromFile\n{raw_path}\n-all:all>all:all\n-unsafe\n{dest_path}\n"
+        subprocess.run(cmd, input=args.encode('utf-8'),
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                       timeout=30, creationflags=no_window)
 
         return True, "成功"
 
