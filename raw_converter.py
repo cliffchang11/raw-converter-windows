@@ -46,14 +46,45 @@ def get_raw_files(source_dir: Path) -> list:
     return sorted(set(files), key=lambda f: f.stat().st_mtime)
 
 
+def run_exiftool_args(exiftool_path, args, stdout_file=None, timeout=30, no_window=True):
+    """
+    透過臨時 UTF-8 .args 檔案執行 ExifTool，以完美且安全地支援 Windows Unicode 路徑。
+    """
+    import tempfile
+    import os
+    
+    fd, temp_path = tempfile.mkstemp(suffix='.args')
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            for arg in args:
+                f.write(f"{arg}\n")
+                
+        cmd = [str(exiftool_path), '-charset', 'filename=utf8', '-@', temp_path]
+        
+        kwargs = {
+            'timeout': timeout,
+        }
+        if no_window and sys.platform == 'win32':
+            kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            
+        if stdout_file:
+            with open(stdout_file, 'wb') as out_f:
+                res = subprocess.run(cmd, stdout=out_f, stderr=subprocess.PIPE, **kwargs)
+        else:
+            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
+            
+        return res
+    finally:
+        try:
+            os.unlink(temp_path)
+        except Exception:
+            pass
+
+
 def get_time_prefix(raw_path: Path, exiftool: Path) -> str:
     """使用 ExifTool 提取拍攝時間作為檔名前綴"""
     try:
-        cmd = [str(exiftool), '-charset', 'filename=utf8', '-s3', '-DateTimeOriginal', '-@', '-']
-        res = subprocess.run(cmd, input=f"{raw_path}\n".encode('utf-8'),
-                             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                             timeout=10,
-                             creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0)
+        res = run_exiftool_args(exiftool, ['-s3', '-DateTimeOriginal', raw_path.as_posix()], timeout=10)
         dt = res.stdout.decode('utf-8', errors='ignore').strip()
         if dt:
             clean = ''.join(c for c in dt if c.isdigit())
@@ -77,43 +108,45 @@ def convert_single_raw(raw_path: Path, dest_path: Path, exiftool: Path) -> tuple
     轉換單張 RAW 照片（preview 模式）
     回傳 (success: bool, message: str)
     """
-    no_window = subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
     temp_jpg = dest_path.with_suffix('.temp.jpg')
+    success = False
+    last_err = ""
 
     try:
+        raw_posix = raw_path.as_posix()
+        dest_posix = dest_path.as_posix()
+
         # 步驟 1：嘗試 JpgFromRaw（Nikon、Sony 常用）
-        cmd = [str(exiftool), '-charset', 'filename=utf8', '-b', '-JpgFromRaw', '-@', '-']
-        res = subprocess.run(cmd, input=f"{raw_path}\n".encode('utf-8'),
-                             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=30,
-                             creationflags=no_window)
-        if res.returncode == 0 and len(res.stdout) > 50 * 1024:
-            with open(temp_jpg, 'wb') as f:
-                f.write(res.stdout)
+        res = run_exiftool_args(exiftool, ['-b', '-JpgFromRaw', raw_posix], stdout_file=temp_jpg)
+        if res.returncode == 0 and temp_jpg.exists() and temp_jpg.stat().st_size > 50 * 1024:
+            success = True
+        else:
+            if res.stderr:
+                last_err = res.stderr.decode('utf-8', errors='ignore').strip()
 
         # 步驟 2：嘗試 PreviewImage（Canon CR3、DNG 等）
-        if not temp_jpg.exists() or temp_jpg.stat().st_size < 50 * 1024:
-            cmd = [str(exiftool), '-charset', 'filename=utf8', '-b', '-PreviewImage', '-@', '-']
-            res = subprocess.run(cmd, input=f"{raw_path}\n".encode('utf-8'),
-                                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=30,
-                                 creationflags=no_window)
-            if res.returncode == 0 and len(res.stdout) > 50 * 1024:
-                with open(temp_jpg, 'wb') as f:
-                    f.write(res.stdout)
+        if not success:
+            res = run_exiftool_args(exiftool, ['-b', '-PreviewImage', raw_posix], stdout_file=temp_jpg)
+            if res.returncode == 0 and temp_jpg.exists() and temp_jpg.stat().st_size > 50 * 1024:
+                success = True
+            else:
+                if res.stderr:
+                    last_err = res.stderr.decode('utf-8', errors='ignore').strip()
 
         # 步驟 3：最後嘗試 ThumbnailImage
-        if not temp_jpg.exists() or temp_jpg.stat().st_size < 10 * 1024:
-            cmd = [str(exiftool), '-charset', 'filename=utf8', '-b', '-ThumbnailImage', '-@', '-']
-            res = subprocess.run(cmd, input=f"{raw_path}\n".encode('utf-8'),
-                                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=30,
-                                 creationflags=no_window)
-            if res.returncode == 0 and len(res.stdout) > 10 * 1024:
-                with open(temp_jpg, 'wb') as f:
-                    f.write(res.stdout)
+        if not success:
+            res = run_exiftool_args(exiftool, ['-b', '-ThumbnailImage', raw_posix], stdout_file=temp_jpg)
+            if res.returncode == 0 and temp_jpg.exists() and temp_jpg.stat().st_size > 10 * 1024:
+                success = True
+            else:
+                if res.stderr:
+                    last_err = res.stderr.decode('utf-8', errors='ignore').strip()
 
-        if not temp_jpg.exists() or temp_jpg.stat().st_size < 10 * 1024:
+        if not success:
             if temp_jpg.exists():
                 temp_jpg.unlink()
-            return False, "無法提取內嵌預覽圖（此 RAW 格式可能不含嵌入 JPEG）"
+            err_msg = f"無法提取內嵌預覽圖。ExifTool 錯誤：{last_err}" if last_err else "無法從 RAW 檔中提取出任何有效的內置預覽圖"
+            return False, err_msg
 
         # 步驟 4：移動至目標路徑
         if dest_path.exists():
@@ -121,11 +154,16 @@ def convert_single_raw(raw_path: Path, dest_path: Path, exiftool: Path) -> tuple
         temp_jpg.rename(dest_path)
 
         # 步驟 5：複製原始 EXIF 至輸出檔案
-        cmd = [str(exiftool), '-charset', 'filename=utf8', '-@', '-']
-        args = f"-overwrite_original\n-TagsFromFile\n{raw_path}\n-all:all>all:all\n-unsafe\n{dest_path}\n"
-        subprocess.run(cmd, input=args.encode('utf-8'),
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                       timeout=30, creationflags=no_window)
+        res = run_exiftool_args(exiftool, [
+            '-overwrite_original',
+            '-TagsFromFile',
+            raw_posix,
+            '-all:all>all:all',
+            '-unsafe',
+            dest_posix
+        ])
+        if res.returncode != 0:
+            return True, "照片轉換成功，但 EXIF 複製過程中出現警告"
 
         return True, "成功"
 
