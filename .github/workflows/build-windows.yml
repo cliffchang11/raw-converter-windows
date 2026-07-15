@@ -35,7 +35,22 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "assets" | Out-Null
-          $url = "https://exiftool.org/exiftool-13.05_64.zip"
+          
+          # 動態解析官網最新 64-bit 版本下載路徑，防止版本更新時舊連結 404
+          Write-Host "Fetching latest ExifTool download link from exiftool.org..."
+          try {
+              $html = Invoke-WebRequest -Uri "https://exiftool.org/" -UseBasicParsing -TimeoutSec 15
+              $link = ($html.Links | Where-Object { $_.href -like "exiftool-*_64.zip" } | Select-Object -First 1).href
+              if (-not $link) {
+                  Write-Host "Failed to parse link from HTML. Falling back to 13.59"
+                  $link = "exiftool-13.59_64.zip"
+              }
+          } catch {
+              Write-Host "Network error while parsing page. Falling back to 13.59"
+              $link = "exiftool-13.59_64.zip"
+          }
+          
+          $url = "https://exiftool.org/$link"
           $zip = "assets\exiftool_tmp.zip"
           Write-Host "Downloading ExifTool from $url..."
           Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
