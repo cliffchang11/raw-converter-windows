@@ -1,15 +1,12 @@
 name: 🏗️ Build Windows Installer
 
 on:
-  # 手動觸發（在 GitHub 網頁上按按鈕即可）
   workflow_dispatch:
     inputs:
       version:
         description: '版本號 (例：1.0.0)'
         required: true
         default: '1.0.0'
-
-  # 或自動在推送 tag 時觸發 (例：git tag v1.0.0 && git push --tags)
   push:
     tags:
       - 'v*'
@@ -18,41 +15,40 @@ jobs:
   build:
     name: Build on Windows
     runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
 
     steps:
-      # ── 1. 取得原始碼 ────────────────────────────────
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
-      # ── 2. 設定 Python ───────────────────────────────
       - name: 🐍 Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      # ── 3. 安裝依賴套件 ──────────────────────────────
       - name: 📦 Install Python dependencies
-        run: |
-          pip install customtkinter pyinstaller pillow --upgrade
-        working-directory: windows_app
+        run: pip install customtkinter pyinstaller pillow --upgrade
 
-      # ── 4. 下載 ExifTool Windows 版 ─────────────────
       - name: 🔧 Download ExifTool
-        shell: powershell
         run: |
           $url = "https://exiftool.org/exiftool-13.05_64.zip"
-          $zip = "windows_app/assets/exiftool_tmp.zip"
-          New-Item -ItemType Directory -Force -Path "windows_app/assets" | Out-Null
+          $zip = "assets\exiftool_tmp.zip"
+          New-Item -ItemType Directory -Force -Path "assets" | Out-Null
           Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
-          Expand-Archive -Path $zip -DestinationPath "windows_app/assets/tmp" -Force
-          Get-ChildItem "windows_app/assets/tmp" -Recurse -Filter "exiftool(-k).exe" |
-            Select-Object -First 1 |
-            Copy-Item -Destination "windows_app/assets/exiftool.exe"
+          Expand-Archive -Path $zip -DestinationPath "assets\tmp" -Force
+          $src = Get-ChildItem "assets\tmp" -Recurse -Filter "exiftool(-k).exe" | Select-Object -First 1
+          if ($src) {
+            Copy-Item $src.FullName -Destination "assets\exiftool.exe"
+            Write-Host "ExifTool OK: $((Get-Item 'assets\exiftool.exe').Length) bytes"
+          } else {
+            Write-Error "exiftool(-k).exe not found in archive!"
+            exit 1
+          }
           Remove-Item $zip -Force
-          Remove-Item "windows_app/assets/tmp" -Recurse -Force
-          Write-Host "ExifTool 下載完成，大小：$((Get-Item 'windows_app/assets/exiftool.exe').Length) bytes"
+          Remove-Item "assets\tmp" -Recurse -Force
 
-      # ── 5. PyInstaller 打包 ──────────────────────────
       - name: 🔨 Build .exe with PyInstaller
         run: |
           pyinstaller `
@@ -63,38 +59,33 @@ jobs:
             --clean `
             --noconfirm `
             raw_converter.py
-        working-directory: windows_app
 
-      # ── 6. 安裝 Inno Setup ───────────────────────────
       - name: 📥 Install Inno Setup 6
-        run: |
-          choco install innosetup --yes --no-progress
+        run: choco install innosetup --yes --no-progress
         shell: cmd
 
-      # ── 7. 編譯安裝程式 ──────────────────────────────
       - name: 📦 Compile Windows Installer
         run: |
-          $version = "${{ github.event.inputs.version || '1.0.0' }}"
-          # 動態更新版本號至 installer.iss
-          (Get-Content installer.iss) -replace 'AppVersion=.*', "AppVersion=$version" |
-            Set-Content installer.iss
-          (Get-Content installer.iss) -replace 'OutputBaseFilename=.*', "OutputBaseFilename=RAW轉檔工具_Setup_v$version" |
+          $version = "${{ github.event.inputs.version }}"
+          if (-not $version) { $version = "1.0.0" }
+          # 更新版本號
+          (Get-Content installer.iss) `
+            -replace 'AppVersion=.*', "AppVersion=$version" `
+            -replace 'OutputBaseFilename=.*', "OutputBaseFilename=RAW轉檔工具_Setup_v$version" |
             Set-Content installer.iss
           New-Item -ItemType Directory -Force -Path installer_output | Out-Null
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
-        shell: powershell
-        working-directory: windows_app
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          & $iscc installer.iss
+          if ($LASTEXITCODE -ne 0) { Write-Error "Inno Setup failed!"; exit 1 }
 
-      # ── 8. 上傳為 Release Artifact ───────────────────
       - name: 📤 Upload installer as artifact
         uses: actions/upload-artifact@v4
         with:
           name: RAW轉檔工具-Windows-Installer
-          path: windows_app/installer_output/*.exe
+          path: installer_output/*.exe
           retention-days: 30
 
-      # ── 9. 若是 tag 推送，自動建立 GitHub Release ──
-      - name: 🚀 Create GitHub Release
+      - name: 🚀 Create GitHub Release (tag only)
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
@@ -105,14 +96,11 @@ jobs:
             ### 安裝方式
             1. 下載下方的 `RAW轉檔工具_Setup_*.exe`
             2. 雙擊執行，依精靈步驟安裝
-            3. 完成！桌面會出現捷徑
+            3. 完成！桌面會出現捷徑，無需額外安裝任何軟體
 
             ### 支援格式
             `.NEF` `.CR2` `.CR3` `.ARW` `.DNG` `.ORF` `.RAF` `.RW2` `.PEF` `.SR2`
 
             ### 系統需求
-            - Windows 10 / 11 (64位元)
-            - 無需額外安裝任何軟體
-          files: windows_app/installer_output/*.exe
-          draft: false
-          prerelease: false
+            Windows 10 / 11 (64位元)
+          files: installer_output/*.exe
