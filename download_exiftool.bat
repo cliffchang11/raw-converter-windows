@@ -30,7 +30,10 @@ powershell -Command ^
     "  Select-Object -First 1 | ForEach-Object { " ^
     "    Copy-Item $_.FullName -Destination 'assets\exiftool.exe' -Force;" ^
     "    $sf = Join-Path $_.DirectoryName 'exiftool_files';" ^
-    "    if (Test-Path $sf) { Copy-Item $sf -Destination 'assets\exiftool_files' -Recurse -Force }" ^
+    "    if (Test-Path $sf) { " ^
+    "      Remove-Item 'assets\exiftool_files' -Recurse -Force -ErrorAction SilentlyContinue;" ^
+    "      Copy-Item $sf -Destination 'assets\exiftool_files' -Recurse -Force;" ^
+    "    }" ^
     "  };" ^
     "Remove-Item $zip -Force;" ^
     "Remove-Item 'assets\exiftool_tmp' -Recurse -Force;" ^

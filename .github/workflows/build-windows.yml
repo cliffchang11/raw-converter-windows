@@ -76,6 +76,7 @@ jobs:
             $sourceDir = $sourceExe.Directory.FullName
             $sourceFilesFolder = Join-Path $sourceDir "exiftool_files"
             if (Test-Path $sourceFilesFolder) {
+              Remove-Item "assets\exiftool_files" -Recurse -Force -ErrorAction SilentlyContinue
               Copy-Item -Path $sourceFilesFolder -Destination "assets\exiftool_files" -Recurse -Force
               Write-Host "exiftool_files folder copied successfully!"
             } else {
