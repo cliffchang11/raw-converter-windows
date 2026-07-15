@@ -31,24 +31,27 @@ jobs:
         shell: pwsh
         run: pip install customtkinter pyinstaller pillow --upgrade
 
-      - name: 🔧 Install ExifTool via Chocolatey
+      - name: 🔧 Download Standalone ExifTool
         shell: pwsh
         run: |
-          # Chocolatey 在 GitHub Actions Windows runner 上已預裝，直接安裝 ExifTool
-          choco install exiftool --yes --no-progress
-          
-          # 找到 chocolatey 安裝的 exiftool.exe 並複製到 assets/
           New-Item -ItemType Directory -Force -Path "assets" | Out-Null
-          $exiftoolPath = (Get-Command exiftool -ErrorAction SilentlyContinue).Source
-          if (-not $exiftoolPath) {
-            $exiftoolPath = "C:\ProgramData\chocolatey\bin\exiftool.exe"
-          }
-          if (Test-Path $exiftoolPath) {
-            Copy-Item $exiftoolPath -Destination "assets\exiftool.exe"
-            Write-Host "ExifTool ready at: $exiftoolPath"
+          $url = "https://exiftool.org/exiftool-13.05_64.zip"
+          $zip = "assets\exiftool_tmp.zip"
+          Write-Host "Downloading ExifTool from $url..."
+          Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
+          Write-Host "Extracting ExifTool..."
+          Expand-Archive -Path $zip -DestinationPath "assets\exiftool_tmp" -Force
+          
+          # 尋找解壓後包含 exiftool(-k).exe 的檔案並複製為 assets/exiftool.exe
+          $sourceExe = Get-ChildItem "assets\exiftool_tmp" -Recurse -Filter "exiftool(-k).exe" | Select-Object -First 1
+          if ($sourceExe) {
+            Copy-Item $sourceExe.FullName -Destination "assets\exiftool.exe"
+            Remove-Item $zip -Force
+            Remove-Item "assets\exiftool_tmp" -Recurse -Force
+            Write-Host "Standalone ExifTool ready!"
             Write-Host "Size: $((Get-Item 'assets\exiftool.exe').Length) bytes"
           } else {
-            Write-Error "exiftool.exe not found after choco install!"
+            Write-Error "exiftool(-k).exe not found in downloaded zip!"
             exit 1
           }
 
