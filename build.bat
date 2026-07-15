@@ -51,6 +51,7 @@ pyinstaller ^
     --windowed ^
     --name "RAW_Converter" ^
     --add-data "assets/exiftool.exe;assets" ^
+    --add-data "assets/exiftool_files;assets/exiftool_files" ^
     --clean ^
     --noconfirm ^
     raw_converter.py

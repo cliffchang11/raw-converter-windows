@@ -27,7 +27,11 @@ powershell -Command ^
     "Write-Host '解壓縮中...';" ^
     "Expand-Archive -Path $zip -DestinationPath 'assets\exiftool_tmp' -Force;" ^
     "Get-ChildItem 'assets\exiftool_tmp' -Recurse -Filter 'exiftool(-k).exe' | " ^
-    "  Select-Object -First 1 | Copy-Item -Destination 'assets\exiftool.exe';" ^
+    "  Select-Object -First 1 | ForEach-Object { " ^
+    "    Copy-Item $_.FullName -Destination 'assets\exiftool.exe' -Force;" ^
+    "    $sf = Join-Path $_.DirectoryName 'exiftool_files';" ^
+    "    if (Test-Path $sf) { Copy-Item $sf -Destination 'assets\exiftool_files' -Recurse -Force }" ^
+    "  };" ^
     "Remove-Item $zip -Force;" ^
     "Remove-Item 'assets\exiftool_tmp' -Recurse -Force;" ^
     "Write-Host 'ExifTool 下載完成！'"

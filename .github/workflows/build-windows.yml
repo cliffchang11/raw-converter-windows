@@ -67,10 +67,21 @@ jobs:
           Write-Host "Extracting ExifTool..."
           Expand-Archive -Path $zip -DestinationPath "assets\exiftool_tmp" -Force
           
-          # 尋找解壓後包含 exiftool(-k).exe 的檔案並複製為 assets/exiftool.exe
+           # 尋找解壓後包含 exiftool(-k).exe 的檔案並複製為 assets/exiftool.exe
           $sourceExe = Get-ChildItem "assets\exiftool_tmp" -Recurse -Filter "exiftool(-k).exe" | Select-Object -First 1
           if ($sourceExe) {
             Copy-Item $sourceExe.FullName -Destination "assets\exiftool.exe"
+            
+            # 複製 64 位元運行所需的 Perl 運行庫目錄
+            $sourceDir = $sourceExe.Directory.FullName
+            $sourceFilesFolder = Join-Path $sourceDir "exiftool_files"
+            if (Test-Path $sourceFilesFolder) {
+              Copy-Item -Path $sourceFilesFolder -Destination "assets\exiftool_files" -Recurse -Force
+              Write-Host "exiftool_files folder copied successfully!"
+            } else {
+              Write-Host "Warning: exiftool_files folder not found next to exiftool(-k).exe"
+            }
+            
             Remove-Item $zip -Force
             Remove-Item "assets\exiftool_tmp" -Recurse -Force
             Write-Host "Standalone ExifTool ready!"
@@ -88,6 +99,7 @@ jobs:
             --windowed `
             --name "RAW_Converter" `
             --add-data "assets/exiftool.exe;assets" `
+            --add-data "assets/exiftool_files;assets/exiftool_files" `
             --clean `
             --noconfirm `
             raw_converter.py
