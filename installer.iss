@@ -14,7 +14,7 @@ PrivilegesRequired=admin
 UninstallDisplayIcon={app}\RAW_Converter.exe
 
 [Tasks]
-Name: "desktopicon"; Description: "在桌面建立捷徑"; GroupDescription: "其他工作"; Flags: checked
+Name: "desktopicon"; Description: "在桌面建立捷徑"; GroupDescription: "其他工作"
 
 [Files]
 Source: "dist\RAW_Converter.exe"; DestDir: "{app}"; Flags: ignoreversion
